@@ -86,8 +86,6 @@ ARG PKG_DEPS="\
     lrzsz \
     gcc \
     g++ \
-    gcc-multilib \
-    g++-multilib \
     build-essential \
     binutils \
     autoconf \
@@ -103,7 +101,6 @@ ARG PKG_DEPS="\
     device-tree-compiler \
     zlib1g-dev \
     libjpeg-dev \
-    libc6-dev-i386 \
     libelf-dev \
     libssl-dev \
     openssl \
@@ -160,6 +157,11 @@ RUN set -eux && \
    DEBIAN_FRONTEND=noninteractive apt-get update -qqy && apt-get upgrade -qqy && \
    # 安装依赖包
    DEBIAN_FRONTEND=noninteractive apt-get install -qqy --no-install-recommends $PKG_DEPS --option=Dpkg::Options::=--force-confdef && \
+   # multilib/i386 交叉编译包仅 amd64 架构提供, 其他架构跳过
+   if [ "${TARGETARCH}" = "amd64" ]; then \
+       DEBIAN_FRONTEND=noninteractive apt-get install -qqy --no-install-recommends \
+           gcc-multilib g++-multilib libc6-dev-i386 --option=Dpkg::Options::=--force-confdef ; \
+   fi && \
    DEBIAN_FRONTEND=noninteractive apt-get -qqy --no-install-recommends autoremove --purge && \
    DEBIAN_FRONTEND=noninteractive apt-get -qqy --no-install-recommends autoclean && \
    rm -rf /var/lib/apt/lists/* && \
@@ -170,9 +172,9 @@ RUN set -eux && \
    # 更改为zsh
    sh -c "$(curl -fsSL https://raw.github.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" || true && \
    sed -i -e "s/bin\/ash/bin\/zsh/" /etc/passwd && \
-   sed -i -e 's/mouse=/mouse-=/g' /usr/share/vim/vim*/defaults.vim && \
-   locale-gen zh_CN.UTF-8 && localedef -f UTF-8 -i zh_CN zh_CN.UTF-8 && locale-gen && \
-   /bin/zsh
+   # vim 默认配置文件存在时才关闭 mouse(不同版本路径不同, 用 find 定位)
+   find /usr/share/vim -name defaults.vim -exec sed -i -e 's/mouse=/mouse-=/g' {} + && \
+   locale-gen zh_CN.UTF-8 && localedef -f UTF-8 -i zh_CN zh_CN.UTF-8 && locale-gen
 
 # ***** 安装 Node.js 最新 LTS（每次构建时安装当前最新版本）*****
 # 使用 n 在构建时获取最新 LTS；若需最新 Current 可改为 n latest

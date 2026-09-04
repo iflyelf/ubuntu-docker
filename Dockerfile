@@ -31,7 +31,7 @@ ARG DEBIAN_FRONTEND=noninteractive
 ENV DEBIAN_FRONTEND=$DEBIAN_FRONTEND
 
 # GO环境变量
-ARG GO_VERSION=1.26.4
+ARG GO_VERSION=1.27.1
 ENV GO_VERSION=$GO_VERSION
 ARG GOROOT=/opt/go
 ENV GOROOT=$GOROOT
@@ -53,6 +53,7 @@ ARG PKG_DEPS="\
     iproute2 \
     net-tools \
     iptables \
+    nftables \
     bridge-utils \
     openvswitch-switch \
     libseccomp2 \
@@ -154,16 +155,23 @@ RUN set -eux && \
    # 解决证书认证失败问题
    touch /etc/apt/apt.conf.d/99verify-peer.conf && echo >>/etc/apt/apt.conf.d/99verify-peer.conf "Acquire { https::Verify-Peer false }" && \
    # 更新系统软件
-   DEBIAN_FRONTEND=noninteractive apt-get update -qqy && apt-get upgrade -qqy && \
+   DEBIAN_FRONTEND=noninteractive apt update -qqy && apt upgrade -qqy && \
    # 安装依赖包
-   DEBIAN_FRONTEND=noninteractive apt-get install -qqy --no-install-recommends $PKG_DEPS --option=Dpkg::Options::=--force-confdef && \
+   DEBIAN_FRONTEND=noninteractive apt install -qqy $PKG_DEPS --option=Dpkg::Options::=--force-confdef && \
    # multilib/i386 交叉编译包仅 amd64 架构提供, 其他架构跳过
    if [ "${TARGETARCH}" = "amd64" ]; then \
-       DEBIAN_FRONTEND=noninteractive apt-get install -qqy --no-install-recommends \
+       DEBIAN_FRONTEND=noninteractive apt install -qqy \
            gcc-multilib g++-multilib libc6-dev-i386 --option=Dpkg::Options::=--force-confdef ; \
    fi && \
-   DEBIAN_FRONTEND=noninteractive apt-get -qqy --no-install-recommends autoremove --purge && \
-   DEBIAN_FRONTEND=noninteractive apt-get -qqy --no-install-recommends autoclean && \
+   # 验证依赖包是否真正安装成功(逐个检查 dpkg 状态, 缺失则构建失败)
+   for pkg in $PKG_DEPS; do \
+       if ! dpkg-query -W -f='${Status}' "$pkg" 2>/dev/null | grep -q "install ok installed"; then \
+           echo "ERROR: 依赖包未成功安装: $pkg" >&2 && exit 1; \
+       fi; \
+   done && \
+   echo "所有依赖包验证通过" && \
+   DEBIAN_FRONTEND=noninteractive apt -qqy autoremove --purge && \
+   DEBIAN_FRONTEND=noninteractive apt -qqy autoclean && \
    rm -rf /var/lib/apt/lists/* && \
    # 更新时区
    ln -sf /usr/share/zoneinfo/${TZ} /etc/localtime && \
@@ -180,8 +188,8 @@ RUN set -eux && \
 # 使用 n 在构建时获取最新 LTS；若需最新 Current 可改为 n latest
 RUN set -eux && \
 curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \
-   DEBIAN_FRONTEND=noninteractive apt-get update -qqy && \
-   DEBIAN_FRONTEND=noninteractive apt-get install -qqy --no-install-recommends nodejs && \
+   DEBIAN_FRONTEND=noninteractive apt update -qqy && \
+   DEBIAN_FRONTEND=noninteractive apt install -qqy nodejs && \
    npm config set registry https://registry.npmmirror.com && \
    npm install -g n && \
    n lts && \

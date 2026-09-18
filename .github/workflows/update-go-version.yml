@@ -30,6 +30,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      actions: write
 
     steps:
     - name: 检出代码
@@ -73,3 +74,10 @@ jobs:
     - name: 无需更新
       if: steps.go.outputs.latest == steps.current.outputs.current
       run: echo "已是最新版本 ${{ steps.current.outputs.current }}, 无需更新"
+
+    - name: 删除旧的GitHub-workflow
+      uses: Mattraks/delete-workflow-runs@main
+      with:
+        repository: ${{ github.repository }}
+        retain_days: 1
+        keep_minimum_runs: 3    #保留多少个workflow不删除

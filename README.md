@@ -15,7 +15,7 @@ Ubuntu 全功能开发/运维基础镜像。内置 **Go / Node.js / Python** 开
 docker pull iflyelf/ubuntu:latest
 
 # 华为云 SWR（国内推荐）
-docker pull swr.cn-east-3.myhuaweicloud.com/danxiaonuo/ubuntu:latest
+docker pull swr.cn-east-3.myhuaweicloud.com/iflyelf/ubuntu:latest
 ```
 
 ## 运行
